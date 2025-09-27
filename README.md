@@ -72,8 +72,6 @@ DATABASE_URL=your_postgresql_connection_string
 # Session secret
 SESSION_SECRET=your_session_secret
 
-# Replit Auth (if using)
-REPLIT_AUTH_DOMAIN=your_replit_auth_domain
 ```
 
 4. Push database schema:
@@ -206,17 +204,6 @@ CREATE TABLE moves (
   created_at TIMESTAMP DEFAULT NOW()
 );
 ```
-
-## Deployment
-
-This project is designed to be deployed on Replit:
-
-1. Push your code to a GitHub repository
-2. Import the repository into Replit
-3. Configure environment variables in Replit Secrets
-4. Click the "Deploy" button to publish to the web
-
-The application will be available at `https://your-repl-name.your-username.repl.co`.
 
 ## Contributing
 
