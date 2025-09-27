@@ -238,4 +238,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-If you encounter any issues or have questions, please open an issue on GitHub or reach out through Replit's community features.
+- **Issues**: [GitHub Issues](https://github.com/AnveshAI/AnveshAI-Chess-Arena/issues)
+
+## Show Your Support
+
+If you find this project helpful, please consider giving it a ⭐ on GitHub!
+
+---
+
+**Made with ❤️ by the AnveshAI team**
