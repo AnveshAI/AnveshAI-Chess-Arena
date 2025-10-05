@@ -1,5 +1,6 @@
 import { Chess } from 'chess.js';
 import { stockfishEngine, EngineEvaluation } from './stockfish';
+import { learningService } from './learning';
 
 export interface GameMove {
   san: string;
@@ -63,9 +64,53 @@ export class ChessGameService {
 
   async makeAIMove(difficulty: number = 1600): Promise<GameMove | null> {
     try {
-      // Adjust thinking time based on difficulty
+      const currentFen = this.chess.fen();
+      let bestMove: string;
+
+      // Try to use learned opening book first (for opening phase)
+      const moveCount = this.chess.history().length;
+      if (moveCount < 15) {
+        const bookMove = learningService.getBookMove(currentFen);
+        if (bookMove) {
+          console.log(`Using learned opening book move: ${bookMove}`);
+          const moveObj = this.chess.move(bookMove);
+          if (moveObj) {
+            return {
+              san: moveObj.san,
+              uci: bookMove,
+              fen: this.chess.fen()
+            };
+          }
+        }
+      }
+
+      // Check if we have learned data for this position
+      if (learningService.hasLearnedPosition(currentFen)) {
+        const commonMoves = learningService.getCommonMoves(currentFen);
+        const learnedEval = learningService.getLearnedEvaluation(currentFen);
+        
+        // Consider learned moves with some probability based on difficulty
+        const useLearnedMove = Math.random() < (difficulty / 2000); // Higher difficulty = more likely to use learned moves
+        
+        if (useLearnedMove && commonMoves.length > 0) {
+          // Validate that the move is legal
+          for (const learnedMove of commonMoves) {
+            const moveObj = this.chess.move(learnedMove);
+            if (moveObj) {
+              console.log(`Using learned move: ${learnedMove} (eval: ${learnedEval})`);
+              return {
+                san: moveObj.san,
+                uci: learnedMove,
+                fen: this.chess.fen()
+              };
+            }
+          }
+        }
+      }
+
+      // Fallback to Stockfish engine
       const thinkingTime = Math.max(500, Math.min(3000, difficulty));
-      const bestMove = await stockfishEngine.getBestMove(this.chess.fen(), thinkingTime);
+      bestMove = await stockfishEngine.getBestMove(currentFen, thinkingTime);
       
       const moveObj = this.chess.move(bestMove);
       if (!moveObj) return null;
