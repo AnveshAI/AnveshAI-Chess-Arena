@@ -33,10 +33,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/games', optionalAuth, async (req: any, res) => {
     try {
       const { playerColor, aiDifficulty } = req.body;
-      
+
       const chessGame = new ChessGameService();
       const gameState = chessGame.getGameState();
-      
+
       let gameData;
       if (req.isGuest) {
         // Guest user - assign guest to chosen color, AI to opposite color
@@ -87,17 +87,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
-      
+
       // Verify guest user can only access their own games
       if (req.isGuest && game.guestId !== req.guestId) {
         return res.status(403).json({ message: "Access denied" });
       }
-      
+
       // Verify authenticated user can only access their own games
       if (!req.isGuest && game.whitePlayerId !== req.user.claims.sub && game.blackPlayerId !== req.user.claims.sub) {
         return res.status(403).json({ message: "Access denied" });
       }
-      
+
       res.json(game);
     } catch (error) {
       console.error("Error fetching game:", error);
@@ -109,7 +109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const gameId = req.params.id;
       const { move } = req.body;
-      
+
       const game = await storage.getGame(gameId);
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
@@ -130,10 +130,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verify it's the player's turn
       const chessGame = new ChessGameService(game.currentFen);
       const gameState = chessGame.getGameState();
-      
+
       const isPlayerTurn = (gameState.turn === 'w' && game.playerColor === 'white') ||
                           (gameState.turn === 'b' && game.playerColor === 'black');
-      
+
       if (!isPlayerTurn) {
         return res.status(400).json({ message: "Not your turn" });
       }
@@ -167,7 +167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (newGameState.isCheckmate) {
           result = gameState.turn === 'w' ? '0-1' : '1-0';
         }
-        
+
         await storage.updateGame(gameId, {
           status: 'completed',
           result,
@@ -217,7 +217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
-      
+
       // Verify ownership - guest or authenticated user
       if (req.isGuest) {
         if (game.guestId !== req.guestId || !game.isGuestGame) {
@@ -229,7 +229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(403).json({ message: "Access denied" });
         }
       }
-      
+
       const moves = await storage.getGameMoves(req.params.id);
       res.json(moves);
     } catch (error) {
@@ -243,7 +243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      
+
       if (!user?.isAdmin) {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -261,16 +261,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const gameId = req.params.id;
       const game = await storage.getGame(gameId);
-      
+
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
 
       const chessGame = new ChessGameService();
       chessGame.loadPGN(game.pgn);
-      
+
       const analysisResult = await chessGame.analyzeGame();
-      
+
       const analysis = await storage.createAnalysis({
         gameId,
         whiteAccuracy: analysisResult.whiteAccuracy,
@@ -288,7 +288,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/games/:id/analysis', isAuthenticated, async (req: any, res) => {
+  // Get learning statistics
+  app.get('/api/learning/stats', async (req, res) => {
+    try {
+      const { learningService } = await import('./services/learning');
+      const stats = learningService.getStatistics();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error getting learning stats:", error);
+      res.status(500).json({ message: "Failed to get learning statistics" });
+    }
+  });
+
+  // Export opening book
+  app.get('/api/learning/opening-book', async (req, res) => {
+    try {
+      const { learningService } = await import('./services/learning');
+      const bookData = learningService.exportOpeningBook();
+      res.json(bookData);
+    } catch (error) {
+      console.error("Error exporting opening book:", error);
+      res.status(500).json({ message: "Failed to export opening book" });
+    }
+  });
+
+  // Manually trigger learning reload
+  app.post('/api/learning/reload', async (req, res) => {
+    try {
+      const { learningService } = await import('./services/learning');
+      await learningService.reload();
+      res.json({ message: "Learning service reloaded successfully" });
+    } catch (error) {
+      console.error("Error reloading learning service:", error);
+      res.status(500).json({ message: "Failed to reload learning service" });
+    }
+  });
+
+  app.get('/api/games/:id/analysis', optionalAuth, async (req: any, res) => {
     try {
       const analysis = await storage.getGameAnalysis(req.params.id);
       const moves = await storage.getGameMoves(req.params.id);
@@ -304,7 +340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const gameId = req.params.id;
       const game = await storage.getGame(gameId);
-      
+
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
@@ -352,7 +388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const gameId = req.params.id;
       const game = await storage.getGame(gameId);
-      
+
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
@@ -431,20 +467,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ws.on('message', async (message) => {
       try {
         const data = JSON.parse(message.toString());
-        
+
         switch (data.type) {
           case 'join_game':
             ws.gameId = data.gameId;
             ws.userId = data.userId;
             ws.isAdmin = data.isAdmin || false;
             break;
-            
+
           case 'spectate_game':
             if (ws.isAdmin) {
               ws.gameId = data.gameId;
             }
             break;
-            
+
           case 'game_update':
             // Broadcast game updates to all connected clients watching this game
             wss.clients.forEach((client: GameSocket) => {
